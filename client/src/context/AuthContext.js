@@ -7,7 +7,7 @@ const AuthContext = createContext(null);
 // ║  TEST MODE — set to true to bypass login                 ║
 // ║  Set back to false when Supabase connection is working   ║
 // ╚═══════════════════════════════════════════════════════════╝
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 const TEST_USER = {
   id: '00000000-0000-0000-0000-000000000001',
