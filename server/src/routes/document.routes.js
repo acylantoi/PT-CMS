@@ -9,10 +9,17 @@ const { createAuditLog, createWorkflowEvent, getClientIp } = require('../utils/a
 
 const router = express.Router();
 
-// Configure multer storage
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Configure multer storage — use /tmp on Vercel (read-only filesystem)
+const uploadDir = process.env.NODE_ENV === 'production'
+  ? '/tmp/uploads'
+  : (process.env.UPLOAD_DIR || './uploads');
+
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Could not create upload dir:', e.message);
 }
 
 const storage = multer.diskStorage({
