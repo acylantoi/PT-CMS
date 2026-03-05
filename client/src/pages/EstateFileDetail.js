@@ -46,37 +46,52 @@ const isAssetComplete = (a) => {
   return s === 'CLOSED' || s === 'COMPLETED';
 };
 
-/* Status Progress */
-const CV_STEPS = [
-  { key: 'RECEIVED_AT_CONVEYANCING', label: 'Received', icon: '\u{1F4E5}' },
-  { key: 'CHECKLIST', label: 'Checklist', icon: '\u2705' },
-  { key: 'FORMS_IN_PROGRESS', label: 'Forms', icon: '\u{1F4DD}' },
-  { key: 'FORMS_READY', label: 'Ready', icon: '\u2713' },
-  { key: 'DOCUMENTS_ISSUED', label: 'Issued', icon: '\u{1F4E4}' },
-  { key: 'AWAITING_RETURNED_TITLE_COPY', label: 'Proof', icon: '\u{1F4CB}' },
-  { key: 'CLOSED', label: 'Closed', icon: '\u{1F512}' }
+/* Status Progress — full lifecycle: pre-conveyancing + conveyancing */
+const LIFECYCLE_STEPS = [
+  { key: 'INTAKE',            label: 'Intake',     icon: '\u{1F4E5}' },
+  { key: 'WAITING_GRANT',     label: 'Grant',      icon: '\u{1F4DC}' },
+  { key: 'CHECKLIST',         label: 'Checklist',  icon: '\u2705' },
+  { key: 'FORMS_IN_PROGRESS', label: 'Forms',      icon: '\u{1F4DD}' },
+  { key: 'FORMS_READY',       label: 'Ready',      icon: '\u2713' },
+  { key: 'DOCUMENTS_ISSUED',  label: 'Issued',     icon: '\u{1F4E4}' },
+  { key: 'PROOF',             label: 'Proof',      icon: '\u{1F4CB}' },
+  { key: 'CLOSED',            label: 'Closed',     icon: '\u{1F512}' }
 ];
 
-function StatusProgress({ convStatus }) {
-  const getStepIdx = (status) => {
-    if (status === 'RECEIVED_AT_CONVEYANCING') return 0;
-    if (status === 'AWAITING_CERTIFIED_COPIES' || status === 'AWAITING_FEE_CONFIRMATION') return 1;
-    if (status === 'FORMS_IN_PROGRESS') return 2;
-    if (status === 'FORMS_READY') return 3;
-    if (status === 'DOCUMENTS_ISSUED') return 4;
-    if (status === 'AWAITING_RETURNED_TITLE_COPY' || status === 'PARTIALLY_CLOSED') return 5;
-    if (status === 'CLOSED') return 6;
+function StatusProgress({ convStatus, estateStatus }) {
+  // Map the combined estate + conveyancing status to a step index in LIFECYCLE_STEPS
+  const getStepIdx = () => {
+    // Pre-conveyancing: use estate status
+    if (estateStatus === 'INTAKE') return 0;
+    if (estateStatus === 'WAITING_GRANT') return 1;
+
+    // Once in conveyancing, use conveyancing status
+    if (!convStatus || convStatus === 'RECEIVED_AT_CONVEYANCING') return 2; // just entered conveyancing
+    if (convStatus === 'AWAITING_CERTIFIED_COPIES' || convStatus === 'AWAITING_FEE_CONFIRMATION') return 2; // checklist stage
+    if (convStatus === 'FORMS_IN_PROGRESS') return 3;
+    if (convStatus === 'FORMS_READY') return 4;
+    if (convStatus === 'DOCUMENTS_ISSUED') return 5;
+    if (convStatus === 'AWAITING_RETURNED_TITLE_COPY' || convStatus === 'PARTIALLY_CLOSED') return 6;
+    if (convStatus === 'CLOSED') return 7;
+
+    // ON_HOLD / COMPLETED with no conv status
+    if (estateStatus === 'ON_HOLD') return 2;
+    if (estateStatus === 'COMPLETED') return 7;
+
     return 0;
   };
-  const idx = getStepIdx(convStatus);
+
+  const idx = getStepIdx();
+  const isOnHold = estateStatus === 'ON_HOLD';
+
   return (
     <div className="status-progress">
-      {CV_STEPS.map((step, i) => {
+      {LIFECYCLE_STEPS.map((step, i) => {
         const done = i < idx;
         const active = i === idx;
         return (
-          <div key={step.key} className={`progress-step ${done ? 'done' : ''} ${active ? 'active' : ''}`}>
-            <div className="step-circle">{done ? '\u2713' : step.icon}</div>
+          <div key={step.key} className={`progress-step ${done ? 'done' : ''} ${active ? 'active' : ''} ${active && isOnHold ? 'on-hold' : ''}`}>
+            <div className="step-circle">{done ? '\u2713' : active && isOnHold ? '\u23F8' : step.icon}</div>
             <div className="step-label">{step.label}</div>
           </div>
         );
@@ -676,7 +691,7 @@ function EstateFileDetail() {
             </div>
           </div>
         </div>
-        <StatusProgress convStatus={convStatus} />
+        <StatusProgress convStatus={convStatus} estateStatus={ef.current_status} />
       </div>
 
       {/* INFO CARDS */}
