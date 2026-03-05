@@ -1166,13 +1166,48 @@ function EstateFileDetail() {
 
       {/* MODALS */}
       <Modal isOpen={showIssueModal} onClose={() => setShowIssueModal(false)} title="Issue Documents to Client">
-        <form onSubmit={handleIssueDocuments}>
-          <div className="form-group"><label>Issue Notes *</label><textarea name="issue_notes" required rows={3} placeholder="e.g., Full document bundle handed to Jane Wambui"></textarea></div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowIssueModal(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Issuing...' : 'Issue Documents'}</button>
-          </div>
-        </form>
+        {(() => {
+          const selectedAsset = assets.find(a => a.id === selectedAssetId);
+          const ps = selectedAsset?.parcel_status || 'PARCEL_CAPTURED';
+          const canIssue = ps === 'SIGNED_SEALED';
+          const statusLabels = {
+            PARCEL_CAPTURED: 'Parcel Captured — transfer not yet prepared',
+            TRANSFER_PREPARED: 'Transfer Prepared — awaiting signing & sealing',
+            SIGNED_SEALED: 'Signed & Sealed — ready to issue',
+            DOCUMENTS_ISSUED: 'Documents already issued',
+            AWAITING_PROOF: 'Awaiting proof of registration',
+            CLOSED: 'Closed'
+          };
+          const nextSteps = {
+            PARCEL_CAPTURED: 'Prepare the transfer first (mark as Transfer Prepared), then sign & seal before issuing.',
+            TRANSFER_PREPARED: 'The transfer must be signed & sealed by the Head of Section before documents can be issued.',
+            DOCUMENTS_ISSUED: 'Documents have already been issued for this asset.',
+            AWAITING_PROOF: 'Documents have already been issued. Awaiting proof of registration.',
+            CLOSED: 'This asset is already closed.'
+          };
+          return canIssue ? (
+            <form onSubmit={handleIssueDocuments}>
+              <div style={{ background: '#E8F5E9', border: '1px solid #C8E6C9', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 13 }}>
+                <strong>{'\u2705'} Asset Status:</strong> {statusLabels[ps]}
+              </div>
+              <div className="form-group"><label>Issue Notes *</label><textarea name="issue_notes" required rows={3} placeholder="e.g., Full document bundle handed to Jane Wambui"></textarea></div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowIssueModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Issuing...' : 'Issue Documents'}</button>
+              </div>
+            </form>
+          ) : (
+            <div>
+              <div style={{ background: '#FFF3E0', border: '1px solid #FFE0B2', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 13 }}>
+                <strong>{'\u26A0\uFE0F'} Asset Status:</strong> {statusLabels[ps] || ps.replace(/_/g, ' ')}
+              </div>
+              <p style={{ fontSize: 13, color: '#555', lineHeight: 1.6 }}>{nextSteps[ps] || 'This asset is not ready for document issuance yet.'}</p>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowIssueModal(false)}>Close</button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       <Modal isOpen={showProofModal} onClose={() => setShowProofModal(false)} title="Record Proof of Registration">
