@@ -794,9 +794,62 @@ function EstateFileDetail() {
                 </div>
               </div>
 
-              {/* Panel C: LR Forms & Signing Workflow */}
+              {/* Panel C: Estate Asset Register Summary */}
               <div className="cv-panel">
-                <h3 className="cv-panel-title">{'\u{1F4DD}'} C. Forms Preparation & Signing Workflow</h3>
+                <h3 className="cv-panel-title">{'\u{1F4BC}'} C. Estate Asset Register</h3>
+                {assets.length === 0 ? <EmptyState icon={'\u{1F4BC}'} message="No assets added yet. Go to the Assets tab to add." /> : (
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                      {Object.entries(assetsByType).map(([type, arr]) => {
+                        const meta = ASSET_TYPE_META[type] || ASSET_TYPE_META.OTHER;
+                        const done = arr.filter(a => isAssetComplete(a)).length;
+                        return (
+                          <div key={type} style={{ background: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 8, padding: '10px 16px', minWidth: 180 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{meta.icon} {meta.short}</div>
+                            <div style={{ fontSize: 12, color: '#666' }}>{done}/{arr.length} completed</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="table-container">
+                      <table>
+                        <thead><tr><th>Type</th><th>Asset</th><th>Status</th><th>Transferee</th><th>Actions</th></tr></thead>
+                        <tbody>
+                          {assets.map(a => {
+                            const meta = ASSET_TYPE_META[a.asset_type] || ASSET_TYPE_META.OTHER;
+                            const status = getAssetStatus(a);
+                            const label = getAssetLabel(a);
+                            return (
+                              <tr key={a.id}>
+                                <td><span style={{ fontSize: 13 }}>{meta.icon} {meta.short}</span></td>
+                                <td><strong>{label}</strong></td>
+                                <td><StatusBadge status={status} /></td>
+                                <td>{a.transferee_name || '\u2014'}</td>
+                                <td>
+                                  {(a.asset_type === 'LAND_PARCEL' || a.asset_type === 'LAND_COMPANY') && canEdit && !a.docs_issued_to_client && status !== 'CLOSED' && (
+                                    <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAssetId(a.id); setShowIssueModal(true); }}>{'\u{1F4E4}'} Issue</button>
+                                  )}
+                                  {(a.asset_type === 'LAND_PARCEL' || a.asset_type === 'LAND_COMPANY') && canEdit && a.docs_issued_to_client && !a.proof_of_registration_received && !a.closure_override && (
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                      <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAssetId(a.id); setShowProofModal(true); }}>{'\u{1F4CB}'} Proof</button>
+                                      {isAdmin && <button className="btn btn-sm btn-secondary" onClick={() => { setSelectedAssetId(a.id); setShowClosureModal(true); }}>{'\u{1F512}'}</button>}
+                                    </div>
+                                  )}
+                                  {isAssetComplete(a) && <span style={{ color: 'var(--success)', fontSize: 12 }}>{'\u2705'} Done</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Panel D: LR Forms & Signing Workflow */}
+              <div className="cv-panel">
+                <h3 className="cv-panel-title">{'\u{1F4DD}'} D. Forms Preparation & Signing Workflow</h3>
                 {!gateOpen && <p style={{ color: 'var(--text-light)', fontStyle: 'italic' }}>Complete the checklist above to unlock forms preparation.</p>}
 
                 {/* Step 1: Forms Preparation */}
@@ -935,59 +988,6 @@ function EstateFileDetail() {
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Panel D: Estate Asset Register Summary */}
-              <div className="cv-panel">
-                <h3 className="cv-panel-title">{'\u{1F4BC}'} D. Estate Asset Register</h3>
-                {assets.length === 0 ? <EmptyState icon={'\u{1F4BC}'} message="No assets added yet. Go to the Assets tab to add." /> : (
-                  <>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                      {Object.entries(assetsByType).map(([type, arr]) => {
-                        const meta = ASSET_TYPE_META[type] || ASSET_TYPE_META.OTHER;
-                        const done = arr.filter(a => isAssetComplete(a)).length;
-                        return (
-                          <div key={type} style={{ background: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 8, padding: '10px 16px', minWidth: 180 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>{meta.icon} {meta.short}</div>
-                            <div style={{ fontSize: 12, color: '#666' }}>{done}/{arr.length} completed</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="table-container">
-                      <table>
-                        <thead><tr><th>Type</th><th>Asset</th><th>Status</th><th>Transferee</th><th>Actions</th></tr></thead>
-                        <tbody>
-                          {assets.map(a => {
-                            const meta = ASSET_TYPE_META[a.asset_type] || ASSET_TYPE_META.OTHER;
-                            const status = getAssetStatus(a);
-                            const label = getAssetLabel(a);
-                            return (
-                              <tr key={a.id}>
-                                <td><span style={{ fontSize: 13 }}>{meta.icon} {meta.short}</span></td>
-                                <td><strong>{label}</strong></td>
-                                <td><StatusBadge status={status} /></td>
-                                <td>{a.transferee_name || '\u2014'}</td>
-                                <td>
-                                  {(a.asset_type === 'LAND_PARCEL' || a.asset_type === 'LAND_COMPANY') && canEdit && !a.docs_issued_to_client && status !== 'CLOSED' && (
-                                    <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAssetId(a.id); setShowIssueModal(true); }}>{'\u{1F4E4}'} Issue</button>
-                                  )}
-                                  {(a.asset_type === 'LAND_PARCEL' || a.asset_type === 'LAND_COMPANY') && canEdit && a.docs_issued_to_client && !a.proof_of_registration_received && !a.closure_override && (
-                                    <div style={{ display: 'flex', gap: 4 }}>
-                                      <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAssetId(a.id); setShowProofModal(true); }}>{'\u{1F4CB}'} Proof</button>
-                                      {isAdmin && <button className="btn btn-sm btn-secondary" onClick={() => { setSelectedAssetId(a.id); setShowClosureModal(true); }}>{'\u{1F512}'}</button>}
-                                    </div>
-                                  )}
-                                  {isAssetComplete(a) && <span style={{ color: 'var(--success)', fontSize: 12 }}>{'\u2705'} Done</span>}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
                 )}
               </div>
 
