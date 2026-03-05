@@ -53,6 +53,7 @@ const LIFECYCLE_STEPS = [
   { key: 'CHECKLIST',         label: 'Checklist',  icon: '\u2705' },
   { key: 'FORMS_IN_PROGRESS', label: 'Forms',      icon: '\u{1F4DD}' },
   { key: 'FORMS_READY',       label: 'Ready',      icon: '\u2713' },
+  { key: 'MEMO_TO_HEAD',      label: 'Memo/Sign',  icon: '\u{270D}\uFE0F' },
   { key: 'DOCUMENTS_ISSUED',  label: 'Issued',     icon: '\u{1F4E4}' },
   { key: 'PROOF',             label: 'Proof',      icon: '\u{1F4CB}' },
   { key: 'CLOSED',            label: 'Closed',     icon: '\u{1F512}' }
@@ -70,13 +71,14 @@ function StatusProgress({ convStatus, estateStatus }) {
     if (convStatus === 'AWAITING_CERTIFIED_COPIES' || convStatus === 'AWAITING_FEE_CONFIRMATION') return 2; // checklist stage
     if (convStatus === 'FORMS_IN_PROGRESS') return 3;
     if (convStatus === 'FORMS_READY') return 4;
-    if (convStatus === 'DOCUMENTS_ISSUED') return 5;
-    if (convStatus === 'AWAITING_RETURNED_TITLE_COPY' || convStatus === 'PARTIALLY_CLOSED') return 6;
-    if (convStatus === 'CLOSED') return 7;
+    if (convStatus === 'MEMO_TO_HEAD') return 5;
+    if (convStatus === 'DOCUMENTS_ISSUED') return 6;
+    if (convStatus === 'AWAITING_RETURNED_TITLE_COPY' || convStatus === 'PARTIALLY_CLOSED') return 7;
+    if (convStatus === 'CLOSED') return 8;
 
     // ON_HOLD / COMPLETED with no conv status
     if (estateStatus === 'ON_HOLD') return 2;
-    if (estateStatus === 'COMPLETED') return 7;
+    if (estateStatus === 'COMPLETED') return 8;
 
     return 0;
   };
@@ -634,7 +636,8 @@ function EstateFileDetail() {
     AWAITING_CERTIFIED_COPIES: ['RECEIVED_AT_CONVEYANCING', 'AWAITING_FEE_CONFIRMATION'],
     AWAITING_FEE_CONFIRMATION: ['RECEIVED_AT_CONVEYANCING', 'AWAITING_CERTIFIED_COPIES', 'FORMS_IN_PROGRESS'],
     FORMS_IN_PROGRESS: ['FORMS_READY'],
-    FORMS_READY: ['DOCUMENTS_ISSUED', 'FORMS_IN_PROGRESS'],
+    FORMS_READY: ['MEMO_TO_HEAD', 'FORMS_IN_PROGRESS'],
+    MEMO_TO_HEAD: ['DOCUMENTS_ISSUED', 'FORMS_READY'],
     DOCUMENTS_ISSUED: ['AWAITING_RETURNED_TITLE_COPY'],
     AWAITING_RETURNED_TITLE_COPY: ['PARTIALLY_CLOSED', 'CLOSED'],
     PARTIALLY_CLOSED: ['CLOSED', 'AWAITING_RETURNED_TITLE_COPY']
@@ -791,10 +794,16 @@ function EstateFileDetail() {
                 </div>
               </div>
 
-              {/* Panel C: LR Forms */}
+              {/* Panel C: LR Forms & Signing Workflow */}
               <div className="cv-panel">
-                <h3 className="cv-panel-title">{'\u{1F4DD}'} C. Forms Preparation (LRA 39 & LRA 42)</h3>
+                <h3 className="cv-panel-title">{'\u{1F4DD}'} C. Forms Preparation & Signing Workflow</h3>
                 {!gateOpen && <p style={{ color: 'var(--text-light)', fontStyle: 'italic' }}>Complete the checklist above to unlock forms preparation.</p>}
+
+                {/* Step 1: Forms Preparation */}
+                <div className="workflow-step-header">
+                  <span className="workflow-step-number">1</span>
+                  <span className="workflow-step-title">Prepare Transfer Forms</span>
+                </div>
                 <div className="forms-grid">
                   {/* LRA Form 39 */}
                   <div className={'form-card' + (ef.lr39_signed_sealed ? ' done' : ef.lr39_prepared ? ' partial' : '')}>
@@ -814,11 +823,6 @@ function EstateFileDetail() {
                         <input type="checkbox" checked={!!ef.lr39_prepared} readOnly disabled={!canEdit || !gateOpen || ef.lr39_prepared} />
                         <span className="form-checkbox-label">Prepared</span>
                         {ef.lr39_prepared_date && <span className="form-checkbox-date">{formatDate(ef.lr39_prepared_date)}</span>}
-                      </label>
-                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed ? undefined : () => handleFormToggle('lr39_signed_sealed')} style={{ cursor: (!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed) ? 'default' : 'pointer' }}>
-                        <input type="checkbox" checked={!!ef.lr39_signed_sealed} readOnly disabled={!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed} />
-                        <span className="form-checkbox-label">Signed & Sealed</span>
-                        {ef.lr39_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr39_signed_sealed_date)}</span>}
                       </label>
                     </div>
                   </div>
@@ -841,14 +845,93 @@ function EstateFileDetail() {
                         <span className="form-checkbox-label">Prepared</span>
                         {ef.lr42_prepared_date && <span className="form-checkbox-date">{formatDate(ef.lr42_prepared_date)}</span>}
                       </label>
-                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed ? undefined : () => handleFormToggle('lr42_signed_sealed')} style={{ cursor: (!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed) ? 'default' : 'pointer' }}>
-                        <input type="checkbox" checked={!!ef.lr42_signed_sealed} readOnly disabled={!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed} />
-                        <span className="form-checkbox-label">Signed & Sealed</span>
-                        {ef.lr42_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr42_signed_sealed_date)}</span>}
-                      </label>
                     </div>
                   </div>
                 </div>
+
+                {/* Step 2: Memo to Head of Section */}
+                <div className="workflow-step-header" style={{ marginTop: 20 }}>
+                  <span className={'workflow-step-number' + (ef.memo_to_head_date ? ' completed' : '')}>{ef.memo_to_head_date ? '\u2713' : '2'}</span>
+                  <span className="workflow-step-title">Memo to Head of Section</span>
+                  {ef.memo_to_head_date && <span className="badge" style={{ background: '#C8E6C9', color: '#1B5E20', marginLeft: 8 }}>Logged</span>}
+                </div>
+                {ef.memo_to_head_date ? (
+                  <div className="memo-summary">
+                    <div className="detail-grid" style={{ marginBottom: 0 }}>
+                      <div className="detail-item"><div className="label">Memo Date</div><div className="value">{formatDate(ef.memo_to_head_date)}</div></div>
+                      <div className="detail-item"><div className="label">Reference</div><div className="value">{ef.memo_to_head_reference || '\u2014'}</div></div>
+                    </div>
+                    {ef.memo_to_head_notes && <div className="notes-box" style={{ marginTop: 8 }}>{'\u{1F4DD}'} {ef.memo_to_head_notes}</div>}
+                  </div>
+                ) : (
+                  <div className={'memo-form-area' + (!ef.lr39_prepared || !ef.lr42_prepared ? ' disabled' : '')}>
+                    {(!ef.lr39_prepared || !ef.lr42_prepared) ? (
+                      <p style={{ color: 'var(--text-light)', fontStyle: 'italic', margin: 0 }}>Both forms must be prepared before logging a memo to the Head of Section.</p>
+                    ) : (
+                      <form className="memo-inline-form" onSubmit={async (e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.target);
+                        try {
+                          await api.patch('/estate-files/' + id, {
+                            memo_to_head_date: new Date().toISOString().split('T')[0],
+                            memo_to_head_reference: fd.get('memo_ref') || null,
+                            memo_to_head_by: user.id,
+                            memo_to_head_notes: fd.get('memo_notes') || null,
+                            conveyancing_status: 'MEMO_TO_HEAD'
+                          });
+                          fetchData();
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'Failed to log memo.');
+                        }
+                      }}>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                          <div style={{ flex: 1, minWidth: 180 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Memo Reference</label>
+                            <input type="text" name="memo_ref" placeholder="e.g. PT/MEMO/2025/001" className="form-input" style={{ marginTop: 4 }} />
+                          </div>
+                          <div style={{ flex: 2, minWidth: 200 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Notes (optional)</label>
+                            <input type="text" name="memo_notes" placeholder="Details for Head of Section..." className="form-input" style={{ marginTop: 4 }} />
+                          </div>
+                          <button type="submit" className="btn btn-primary" disabled={!canEdit || !gateOpen}>
+                            {'\u{1F4E8}'} Log Memo
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 3: Head Signs & Seals */}
+                <div className="workflow-step-header" style={{ marginTop: 20 }}>
+                  <span className={'workflow-step-number' + (ef.lr39_signed_sealed && ef.lr42_signed_sealed ? ' completed' : '')}>{ef.lr39_signed_sealed && ef.lr42_signed_sealed ? '\u2713' : '3'}</span>
+                  <span className="workflow-step-title">Head of Section Signs & Seals</span>
+                  {ef.lr39_signed_sealed && ef.lr42_signed_sealed && <span className="badge" style={{ background: '#C8E6C9', color: '#1B5E20', marginLeft: 8 }}>Complete</span>}
+                </div>
+                {!ef.memo_to_head_date ? (
+                  <p style={{ color: 'var(--text-light)', fontStyle: 'italic' }}>Log memo to Head of Section first before signing & sealing.</p>
+                ) : (
+                  <div className="forms-grid">
+                    <div className={'form-card signing-card' + (ef.lr39_signed_sealed ? ' done' : '')}>
+                      <div className="form-card-body">
+                        <label className="form-checkbox-row" onClick={!canEdit || !ef.memo_to_head_date || ef.lr39_signed_sealed ? undefined : () => handleFormToggle('lr39_signed_sealed')} style={{ cursor: (!canEdit || !ef.memo_to_head_date || ef.lr39_signed_sealed) ? 'default' : 'pointer' }}>
+                          <input type="checkbox" checked={!!ef.lr39_signed_sealed} readOnly disabled={!canEdit || !ef.memo_to_head_date || ef.lr39_signed_sealed} />
+                          <span className="form-checkbox-label"><strong>LRA 39</strong> — Signed & Sealed</span>
+                          {ef.lr39_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr39_signed_sealed_date)}</span>}
+                        </label>
+                      </div>
+                    </div>
+                    <div className={'form-card signing-card' + (ef.lr42_signed_sealed ? ' done' : '')}>
+                      <div className="form-card-body">
+                        <label className="form-checkbox-row" onClick={!canEdit || !ef.memo_to_head_date || ef.lr42_signed_sealed ? undefined : () => handleFormToggle('lr42_signed_sealed')} style={{ cursor: (!canEdit || !ef.memo_to_head_date || ef.lr42_signed_sealed) ? 'default' : 'pointer' }}>
+                          <input type="checkbox" checked={!!ef.lr42_signed_sealed} readOnly disabled={!canEdit || !ef.memo_to_head_date || ef.lr42_signed_sealed} />
+                          <span className="form-checkbox-label"><strong>LRA 42</strong> — Signed & Sealed</span>
+                          {ef.lr42_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr42_signed_sealed_date)}</span>}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Panel D: Estate Asset Register Summary */}

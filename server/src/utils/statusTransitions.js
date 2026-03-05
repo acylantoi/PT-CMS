@@ -6,11 +6,17 @@
  *   AWAITING_CERTIFIED_COPIES → RECEIVED_AT_CONVEYANCING | AWAITING_FEE_CONFIRMATION
  *   AWAITING_FEE_CONFIRMATION → RECEIVED_AT_CONVEYANCING | AWAITING_CERTIFIED_COPIES | FORMS_IN_PROGRESS
  *   FORMS_IN_PROGRESS → FORMS_READY
- *   FORMS_READY → DOCUMENTS_ISSUED
+ *   FORMS_READY → MEMO_TO_HEAD | FORMS_IN_PROGRESS
+ *   MEMO_TO_HEAD → DOCUMENTS_ISSUED | FORMS_READY
  *   DOCUMENTS_ISSUED → AWAITING_RETURNED_TITLE_COPY
  *   AWAITING_RETURNED_TITLE_COPY → PARTIALLY_CLOSED | CLOSED
  *   PARTIALLY_CLOSED → CLOSED
  *   CLOSED → (terminal)
+ *
+ * The MEMO_TO_HEAD stage represents the signing workflow:
+ *   1. Officer prepares forms (FORMS_IN_PROGRESS → FORMS_READY)
+ *   2. Memo is logged to Head of Section (FORMS_READY → MEMO_TO_HEAD)
+ *   3. Head signs & seals, then dispatch (MEMO_TO_HEAD → DOCUMENTS_ISSUED)
  *
  * PARCEL statuses:
  *   PARCEL_CAPTURED → TRANSFER_PREPARED
@@ -27,7 +33,8 @@ const CONVEYANCING_STATUS_TRANSITIONS = {
   AWAITING_CERTIFIED_COPIES: ['RECEIVED_AT_CONVEYANCING', 'AWAITING_FEE_CONFIRMATION'],
   AWAITING_FEE_CONFIRMATION: ['RECEIVED_AT_CONVEYANCING', 'AWAITING_CERTIFIED_COPIES', 'FORMS_IN_PROGRESS'],
   FORMS_IN_PROGRESS: ['FORMS_READY'],
-  FORMS_READY: ['DOCUMENTS_ISSUED', 'FORMS_IN_PROGRESS'],
+  FORMS_READY: ['MEMO_TO_HEAD', 'FORMS_IN_PROGRESS'],
+  MEMO_TO_HEAD: ['DOCUMENTS_ISSUED', 'FORMS_READY'],
   DOCUMENTS_ISSUED: ['AWAITING_RETURNED_TITLE_COPY'],
   AWAITING_RETURNED_TITLE_COPY: ['PARTIALLY_CLOSED', 'CLOSED'],
   PARTIALLY_CLOSED: ['CLOSED', 'AWAITING_RETURNED_TITLE_COPY'],
@@ -163,6 +170,36 @@ function checkGenericAssetCompletionGate(asset) {
 }
 
 /**
+ * Memo signing gate: cannot move from MEMO_TO_HEAD → DOCUMENTS_ISSUED
+ * unless both LR39 and LR42 are signed & sealed.
+ */
+function checkSigningGate(estateFile) {
+  const errors = [];
+  if (!estateFile.lr39_signed_sealed) {
+    errors.push('LRA Form 39 must be signed & sealed before dispatch.');
+  }
+  if (!estateFile.lr42_signed_sealed) {
+    errors.push('LRA Form 42 must be signed & sealed before dispatch.');
+  }
+  return errors;
+}
+
+/**
+ * Memo gate: cannot move to MEMO_TO_HEAD unless both forms are prepared
+ * and a memo reference is recorded.
+ */
+function checkMemoGate(estateFile) {
+  const errors = [];
+  if (!estateFile.lr39_prepared) {
+    errors.push('LRA Form 39 must be prepared before logging memo.');
+  }
+  if (!estateFile.lr42_prepared) {
+    errors.push('LRA Form 42 must be prepared before logging memo.');
+  }
+  return errors;
+}
+
+/**
  * File closure gate: all assets must be closed/completed OR override used.
  */
 function checkFileClosureGate(assets) {
@@ -194,6 +231,8 @@ module.exports = {
   TRANSFER_STATUS_TRANSITIONS,
   isValidTransition,
   checkConveyancingGate,
+  checkMemoGate,
+  checkSigningGate,
   checkParcelClosureGate,
   checkGenericAssetCompletionGate,
   checkFileClosureGate

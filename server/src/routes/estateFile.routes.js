@@ -7,6 +7,8 @@ const {
   ESTATE_STATUS_TRANSITIONS,
   isValidTransition,
   checkConveyancingGate,
+  checkMemoGate,
+  checkSigningGate,
   checkFileClosureGate
 } = require('../utils/statusTransitions');
 
@@ -274,6 +276,30 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
         }
       }
 
+      // Gate check: cannot move to MEMO_TO_HEAD unless both forms are prepared
+      if (newStatus === 'MEMO_TO_HEAD') {
+        const checkData = { ...before, ...req.body };
+        const memoErrors = checkMemoGate(checkData);
+        if (memoErrors.length > 0) {
+          return res.status(400).json({
+            error: 'Memo gate check failed.',
+            blockers: memoErrors
+          });
+        }
+      }
+
+      // Gate check: cannot move from MEMO_TO_HEAD to DOCUMENTS_ISSUED unless signed & sealed
+      if (newStatus === 'DOCUMENTS_ISSUED' && currentStatus === 'MEMO_TO_HEAD') {
+        const checkData = { ...before, ...req.body };
+        const signingErrors = checkSigningGate(checkData);
+        if (signingErrors.length > 0) {
+          return res.status(400).json({
+            error: 'Signing gate check failed.',
+            blockers: signingErrors
+          });
+        }
+      }
+
       // Closure gate: cannot close file unless all parcels are closed
       if (newStatus === 'CLOSED') {
         const parcels = await query(
@@ -312,7 +338,9 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
       'lr39_prepared', 'lr39_prepared_date', 'lr39_prepared_by',
       'lr39_signed_sealed', 'lr39_signed_sealed_date', 'lr39_signed_sealed_by',
       'lr42_prepared', 'lr42_prepared_date', 'lr42_prepared_by',
-      'lr42_signed_sealed', 'lr42_signed_sealed_date', 'lr42_signed_sealed_by'
+      'lr42_signed_sealed', 'lr42_signed_sealed_date', 'lr42_signed_sealed_by',
+      // Memo to Head of Section fields
+      'memo_to_head_date', 'memo_to_head_reference', 'memo_to_head_by', 'memo_to_head_notes'
     ];
 
     const updates = [];
@@ -367,7 +395,8 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
     const checklistFields = [
       'certified_copy_grant_present', 'certified_copy_summary_cert_present',
       'fees_paid_status', 'lr39_prepared', 'lr42_prepared',
-      'lr39_signed_sealed', 'lr42_signed_sealed'
+      'lr39_signed_sealed', 'lr42_signed_sealed',
+      'memo_to_head_reference'
     ];
     for (const field of checklistFields) {
       if (req.body[field] !== undefined && req.body[field] !== before[field]) {
