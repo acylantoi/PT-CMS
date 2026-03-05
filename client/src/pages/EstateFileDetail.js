@@ -799,7 +799,10 @@ function EstateFileDetail() {
                   {/* LRA Form 39 */}
                   <div className={'form-card' + (ef.lr39_signed_sealed ? ' done' : ef.lr39_prepared ? ' partial' : '')}>
                     <div className="form-card-header">
-                      <strong>LRA Form 39</strong>
+                      <div>
+                        <strong>LRA Form 39</strong>
+                        <div style={{ fontSize: 11, color: '#888', fontWeight: 400, marginTop: 2 }}>Estate → Public Trustee</div>
+                      </div>
                       {ef.lr39_signed_sealed
                         ? <span className="badge" style={{ background: '#C8E6C9', color: '#1B5E20' }}>{'\u2713'} Signed & Sealed</span>
                         : ef.lr39_prepared
@@ -807,29 +810,25 @@ function EstateFileDetail() {
                           : <span className="badge" style={{ background: '#FFF9C4', color: '#F57F17' }}>Pending</span>}
                     </div>
                     <div className="form-card-body">
-                      <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Transfers property from estate to Public Trustee</div>
-                      <div className="checklist-grid" style={{ gap: 4 }}>
-                        <ChecklistItem
-                          checked={ef.lr39_prepared}
-                          label="Prepared"
-                          detail={ef.lr39_prepared ? formatDate(ef.lr39_prepared_date) : null}
-                          onToggle={() => handleFormToggle('lr39_prepared')}
-                          disabled={!canEdit || !gateOpen || ef.lr39_prepared}
-                        />
-                        <ChecklistItem
-                          checked={ef.lr39_signed_sealed}
-                          label="Signed & Sealed"
-                          detail={ef.lr39_signed_sealed ? formatDate(ef.lr39_signed_sealed_date) : null}
-                          onToggle={() => handleFormToggle('lr39_signed_sealed')}
-                          disabled={!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed}
-                        />
-                      </div>
+                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || ef.lr39_prepared ? undefined : () => handleFormToggle('lr39_prepared')} style={{ cursor: (!canEdit || !gateOpen || ef.lr39_prepared) ? 'default' : 'pointer' }}>
+                        <input type="checkbox" checked={!!ef.lr39_prepared} readOnly disabled={!canEdit || !gateOpen || ef.lr39_prepared} />
+                        <span className="form-checkbox-label">Prepared</span>
+                        {ef.lr39_prepared_date && <span className="form-checkbox-date">{formatDate(ef.lr39_prepared_date)}</span>}
+                      </label>
+                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed ? undefined : () => handleFormToggle('lr39_signed_sealed')} style={{ cursor: (!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed) ? 'default' : 'pointer' }}>
+                        <input type="checkbox" checked={!!ef.lr39_signed_sealed} readOnly disabled={!canEdit || !gateOpen || !ef.lr39_prepared || ef.lr39_signed_sealed} />
+                        <span className="form-checkbox-label">Signed & Sealed</span>
+                        {ef.lr39_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr39_signed_sealed_date)}</span>}
+                      </label>
                     </div>
                   </div>
                   {/* LRA Form 42 */}
                   <div className={'form-card' + (ef.lr42_signed_sealed ? ' done' : ef.lr42_prepared ? ' partial' : '')}>
                     <div className="form-card-header">
-                      <strong>LRA Form 42</strong>
+                      <div>
+                        <strong>LRA Form 42</strong>
+                        <div style={{ fontSize: 11, color: '#888', fontWeight: 400, marginTop: 2 }}>Public Trustee → Beneficiary</div>
+                      </div>
                       {ef.lr42_signed_sealed
                         ? <span className="badge" style={{ background: '#C8E6C9', color: '#1B5E20' }}>{'\u2713'} Signed & Sealed</span>
                         : ef.lr42_prepared
@@ -837,23 +836,16 @@ function EstateFileDetail() {
                           : <span className="badge" style={{ background: '#FFF9C4', color: '#F57F17' }}>Pending</span>}
                     </div>
                     <div className="form-card-body">
-                      <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Transfers property from Public Trustee to beneficiary</div>
-                      <div className="checklist-grid" style={{ gap: 4 }}>
-                        <ChecklistItem
-                          checked={ef.lr42_prepared}
-                          label="Prepared"
-                          detail={ef.lr42_prepared ? formatDate(ef.lr42_prepared_date) : null}
-                          onToggle={() => handleFormToggle('lr42_prepared')}
-                          disabled={!canEdit || !gateOpen || ef.lr42_prepared}
-                        />
-                        <ChecklistItem
-                          checked={ef.lr42_signed_sealed}
-                          label="Signed & Sealed"
-                          detail={ef.lr42_signed_sealed ? formatDate(ef.lr42_signed_sealed_date) : null}
-                          onToggle={() => handleFormToggle('lr42_signed_sealed')}
-                          disabled={!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed}
-                        />
-                      </div>
+                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || ef.lr42_prepared ? undefined : () => handleFormToggle('lr42_prepared')} style={{ cursor: (!canEdit || !gateOpen || ef.lr42_prepared) ? 'default' : 'pointer' }}>
+                        <input type="checkbox" checked={!!ef.lr42_prepared} readOnly disabled={!canEdit || !gateOpen || ef.lr42_prepared} />
+                        <span className="form-checkbox-label">Prepared</span>
+                        {ef.lr42_prepared_date && <span className="form-checkbox-date">{formatDate(ef.lr42_prepared_date)}</span>}
+                      </label>
+                      <label className="form-checkbox-row" onClick={!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed ? undefined : () => handleFormToggle('lr42_signed_sealed')} style={{ cursor: (!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed) ? 'default' : 'pointer' }}>
+                        <input type="checkbox" checked={!!ef.lr42_signed_sealed} readOnly disabled={!canEdit || !gateOpen || !ef.lr42_prepared || ef.lr42_signed_sealed} />
+                        <span className="form-checkbox-label">Signed & Sealed</span>
+                        {ef.lr42_signed_sealed_date && <span className="form-checkbox-date">{formatDate(ef.lr42_signed_sealed_date)}</span>}
+                      </label>
                     </div>
                   </div>
                 </div>
