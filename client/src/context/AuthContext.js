@@ -3,10 +3,25 @@ import api from '../services/api';
 
 const AuthContext = createContext(null);
 
+// ╔═══════════════════════════════════════════════════════════╗
+// ║  TEST MODE — set to true to bypass login                 ║
+// ║  Set back to false when Supabase connection is working   ║
+// ╚═══════════════════════════════════════════════════════════╝
+const TEST_MODE = true;
+
+const TEST_USER = {
+  id: '00000000-0000-0000-0000-000000000001',
+  username: 'admin',
+  full_name: 'System Administrator',
+  email: 'admin@pt-cms.local',
+  role: 'ADMIN',
+  active: true
+};
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('pt_cms_token'));
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(TEST_MODE ? TEST_USER : null);
+  const [token, setToken] = useState(TEST_MODE ? 'test-token' : localStorage.getItem('pt_cms_token'));
+  const [loading, setLoading] = useState(TEST_MODE ? false : true);
 
   const logout = useCallback(() => {
     localStorage.removeItem('pt_cms_token');
@@ -16,6 +31,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (TEST_MODE) return; // Skip auth verification in test mode
     if (token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       api.get('/auth/me')

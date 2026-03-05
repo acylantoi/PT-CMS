@@ -1,10 +1,82 @@
 import React from 'react';
 
+const STATUS_COLORS = {
+  // Conveyancing file statuses
+  RECEIVED_AT_CONVEYANCING: { bg: '#E3F2FD', color: '#1565C0' },
+  AWAITING_CERTIFIED_COPIES: { bg: '#FFF3E0', color: '#E65100' },
+  AWAITING_FEE_CONFIRMATION: { bg: '#FFF8E1', color: '#F57F17' },
+  FORMS_IN_PROGRESS: { bg: '#E8F5E9', color: '#2E7D32' },
+  FORMS_READY: { bg: '#C8E6C9', color: '#1B5E20' },
+  DOCUMENTS_ISSUED: { bg: '#E1F5FE', color: '#0277BD' },
+  AWAITING_RETURNED_TITLE_COPY: { bg: '#F3E5F5', color: '#7B1FA2' },
+  PARTIALLY_CLOSED: { bg: '#FCE4EC', color: '#AD1457' },
+  CLOSED: { bg: '#ECEFF1', color: '#455A64' },
+  // Parcel statuses
+  PARCEL_CAPTURED: { bg: '#E3F2FD', color: '#1565C0' },
+  TRANSFER_PREPARED: { bg: '#FFF3E0', color: '#E65100' },
+  SIGNED_SEALED: { bg: '#E8F5E9', color: '#2E7D32' },
+  AWAITING_PROOF: { bg: '#F3E5F5', color: '#7B1FA2' },
+  // Legacy estate statuses
+  INTAKE: { bg: '#E3F2FD', color: '#1565C0' },
+  WAITING_GRANT: { bg: '#FFF3E0', color: '#E65100' },
+  IN_CONVEYANCING: { bg: '#E8F5E9', color: '#2E7D32' },
+  PARTIALLY_COMPLETED: { bg: '#FCE4EC', color: '#AD1457' },
+  COMPLETED: { bg: '#C8E6C9', color: '#1B5E20' },
+  ON_HOLD: { bg: '#FFF9C4', color: '#F57F17' },
+  // Legacy asset statuses
+  PENDING: { bg: '#E3F2FD', color: '#1565C0' },
+  IN_PROGRESS: { bg: '#E8F5E9', color: '#2E7D32' },
+  // Transfer statuses
+  DRAFT: { bg: '#ECEFF1', color: '#546E7A' },
+  READY_FOR_SIGN: { bg: '#FFF3E0', color: '#E65100' },
+  UPLOADED: { bg: '#E1F5FE', color: '#0277BD' },
+  RELEASED_TO_CLIENT: { bg: '#EDE7F6', color: '#5E35B1' },
+  // Administration types
+  COURT: { bg: '#E3F2FD', color: '#1565C0' },
+  SUMMARY: { bg: '#FFF3E0', color: '#E65100' },
+  COURT_GRANT: { bg: '#E3F2FD', color: '#1565C0' },
+  SUMMARY_CERT: { bg: '#FFF3E0', color: '#E65100' },
+  // Fees
+  PAID: { bg: '#C8E6C9', color: '#1B5E20' },
+  NOT_PAID: { bg: '#FFCDD2', color: '#B71C1C' },
+  UNKNOWN: { bg: '#FFF9C4', color: '#F57F17' },
+  EXEMPT: { bg: '#E0F7FA', color: '#00695C' },
+  // Doc types
+  GRANT: { bg: '#E8F5E9', color: '#2E7D32' },
+  CONFIRMED_GRANT: { bg: '#C8E6C9', color: '#1B5E20' },
+  SUMMARY_CERT_DOC: { bg: '#FFF3E0', color: '#E65100' },
+  ID_COPY: { bg: '#ECEFF1', color: '#455A64' },
+  SEARCH: { bg: '#E1F5FE', color: '#0277BD' },
+  TRANSFER_FORM: { bg: '#F3E5F5', color: '#7B1FA2' },
+  CONSENT: { bg: '#E0F7FA', color: '#00695C' },
+  ECITIZEN_UPLOAD: { bg: '#EDE7F6', color: '#5E35B1' },
+  OTHER: { bg: '#ECEFF1', color: '#546E7A' },
+  TRANSMISSION: { bg: '#E8F5E9', color: '#2E7D32' },
+  TRANSFER: { bg: '#E3F2FD', color: '#1565C0' },
+  // Asset types
+  LAND_PARCEL: { bg: '#E8F5E9', color: '#2E7D32' },
+  LAND_COMPANY: { bg: '#C8E6C9', color: '#1B5E20' },
+  SHARES_CDSC: { bg: '#E3F2FD', color: '#1565C0' },
+  SHARES_CERTIFICATE: { bg: '#E1F5FE', color: '#0277BD' },
+  MOTOR_VEHICLE: { bg: '#FFF3E0', color: '#E65100' },
+  UFAA_CLAIM: { bg: '#F3E5F5', color: '#7B1FA2' },
+  DISCHARGE_OF_CHARGE: { bg: '#FCE4EC', color: '#AD1457' },
+  // Generic asset statuses
+  NOT_STARTED: { bg: '#ECEFF1', color: '#546E7A' },
+  AWAITING_DOCUMENTS: { bg: '#FFF3E0', color: '#E65100' },
+  FORMS_PREPARED: { bg: '#E8F5E9', color: '#2E7D32' },
+  SUBMITTED: { bg: '#E1F5FE', color: '#0277BD' },
+};
+
 export function StatusBadge({ status }) {
   if (!status) return null;
-  const className = `badge badge-${status.toLowerCase()}`;
+  const colors = STATUS_COLORS[status] || { bg: '#ECEFF1', color: '#455A64' };
   const label = status.replace(/_/g, ' ');
-  return <span className={className}>{label}</span>;
+  return (
+    <span className="badge" style={{ background: colors.bg, color: colors.color }}>
+      {label}
+    </span>
+  );
 }
 
 export function Pagination({ pagination, onPageChange }) {

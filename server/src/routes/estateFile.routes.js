@@ -2,7 +2,13 @@ const express = require('express');
 const { query } = require('../db/connection');
 const { authenticate, authorize } = require('../middleware/auth');
 const { createAuditLog, createWorkflowEvent, getClientIp } = require('../utils/audit');
-const { ESTATE_STATUS_TRANSITIONS, isValidTransition } = require('../utils/statusTransitions');
+const {
+  CONVEYANCING_STATUS_TRANSITIONS,
+  ESTATE_STATUS_TRANSITIONS,
+  isValidTransition,
+  checkConveyancingGate,
+  checkFileClosureGate
+} = require('../utils/statusTransitions');
 
 const router = express.Router();
 
@@ -146,14 +152,17 @@ router.get('/:id', authenticate, async (req, res, next) => {
   }
 });
 
-// POST /api/estate-files — create
+// POST /api/estate-files — create (conveyancing intake)
 router.post('/', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (req, res, next) => {
   try {
     const {
       file_number, deceased_full_name, deceased_id_no, date_of_death,
       county, sub_county, intake_date, administration_type,
       grant_reference, grant_date, confirmed_grant_date,
-      estate_value_estimate, assigned_officer_id, notes
+      estate_value_estimate, assigned_officer_id, notes,
+      // Conveyancing fields
+      conveyancing_received_date, administration_route,
+      conveyancing_assigned_officer_id
     } = req.body;
 
     // Validation
@@ -165,13 +174,20 @@ router.post('/', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (re
       return res.status(400).json({ error: 'administration_type must be COURT or SUMMARY.' });
     }
 
+    // Auto-set administration_route from administration_type if not provided
+    const route = administration_route || (administration_type === 'COURT' ? 'COURT_GRANT' : 'SUMMARY_CERT');
+    const receivedDate = conveyancing_received_date || new Date().toISOString().split('T')[0];
+
     const result = await query(`
       INSERT INTO estate_files (
         file_number, deceased_full_name, deceased_id_no, date_of_death,
         county, sub_county, intake_date, administration_type,
         grant_reference, grant_date, confirmed_grant_date,
-        estate_value_estimate, assigned_officer_id, notes, created_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        estate_value_estimate, assigned_officer_id, notes, created_by,
+        conveyancing_received_date, administration_route,
+        conveyancing_assigned_officer_id, conveyancing_status,
+        current_status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'RECEIVED_AT_CONVEYANCING','IN_CONVEYANCING')
       RETURNING *
     `, [
       file_number.trim(), deceased_full_name.trim(), deceased_id_no || null,
@@ -179,7 +195,9 @@ router.post('/', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (re
       intake_date || new Date().toISOString().split('T')[0], administration_type,
       grant_reference || null, grant_date || null, confirmed_grant_date || null,
       estate_value_estimate || null, assigned_officer_id || null,
-      notes || null, req.user.id
+      notes || null, req.user.id,
+      receivedDate, route,
+      conveyancing_assigned_officer_id || assigned_officer_id || null
     ]);
 
     const estateFile = result.rows[0];
@@ -198,8 +216,8 @@ router.post('/', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (re
     await createWorkflowEvent({
       estateFileId: estateFile.id,
       eventType: 'STATUS_CHANGE',
-      toStatus: 'INTAKE',
-      description: `Estate file ${file_number} created for ${deceased_full_name}`,
+      toStatus: 'RECEIVED_AT_CONVEYANCING',
+      description: `File received at Conveyancing Section for ${deceased_full_name}`,
       performedBy: req.user.id,
       ipAddress: getClientIp(req)
     });
@@ -210,7 +228,7 @@ router.post('/', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (re
   }
 });
 
-// PATCH /api/estate-files/:id — update
+// PATCH /api/estate-files/:id — update (conveyancing workflow)
 router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (req, res, next) => {
   try {
     const estateId = req.params.id;
@@ -224,14 +242,55 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
 
     // Clerk restrictions
     if (req.user.role === 'CLERK') {
-      const restrictedFields = ['current_status', 'assigned_officer_id'];
+      const restrictedFields = ['conveyancing_status', 'current_status', 'assigned_officer_id'];
       const attempted = Object.keys(req.body).filter(k => restrictedFields.includes(k));
       if (attempted.length > 0) {
         return res.status(403).json({ error: `Clerks cannot update: ${attempted.join(', ')}` });
       }
     }
 
-    // Validate status transition
+    // Validate conveyancing status transition
+    if (req.body.conveyancing_status && req.body.conveyancing_status !== before.conveyancing_status) {
+      const newStatus = req.body.conveyancing_status;
+      const currentStatus = before.conveyancing_status;
+
+      if (!isValidTransition(CONVEYANCING_STATUS_TRANSITIONS, currentStatus, newStatus)) {
+        return res.status(400).json({
+          error: `Invalid conveyancing status transition from ${currentStatus} to ${newStatus}.`,
+          allowed: CONVEYANCING_STATUS_TRANSITIONS[currentStatus]
+        });
+      }
+
+      // Gate check: cannot move to FORMS_IN_PROGRESS without passing checklist
+      if (newStatus === 'FORMS_IN_PROGRESS') {
+        // Merge pending body changes with current record for gate check
+        const checkData = { ...before, ...req.body };
+        const gateErrors = checkConveyancingGate(checkData);
+        if (gateErrors.length > 0) {
+          return res.status(400).json({
+            error: 'Conveyancing gate check failed.',
+            blockers: gateErrors
+          });
+        }
+      }
+
+      // Closure gate: cannot close file unless all parcels are closed
+      if (newStatus === 'CLOSED') {
+        const parcels = await query(
+          "SELECT * FROM assets WHERE estate_file_id = $1 AND is_deleted = false",
+          [estateId]
+        );
+        const closureErrors = checkFileClosureGate(parcels.rows);
+        if (closureErrors.length > 0 && req.user.role !== 'ADMIN') {
+          return res.status(400).json({
+            error: 'File closure gate failed.',
+            blockers: closureErrors
+          });
+        }
+      }
+    }
+
+    // Legacy current_status validation (backward compat)
     if (req.body.current_status && req.body.current_status !== before.current_status) {
       if (!isValidTransition(ESTATE_STATUS_TRANSITIONS, before.current_status, req.body.current_status)) {
         return res.status(400).json({
@@ -239,23 +298,21 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
           allowed: ESTATE_STATUS_TRANSITIONS[before.current_status]
         });
       }
-
-      // Cannot complete if any assets are not completed
-      if (req.body.current_status === 'COMPLETED') {
-        const incompleteAssets = await query(
-          "SELECT COUNT(*) FROM assets WHERE estate_file_id = $1 AND is_deleted = false AND asset_status != 'COMPLETED'",
-          [estateId]
-        );
-        if (parseInt(incompleteAssets.rows[0].count) > 0) {
-          return res.status(400).json({ error: 'Cannot complete estate file: some assets are not completed.' });
-        }
-      }
     }
 
     const allowedFields = [
       'deceased_full_name', 'deceased_id_no', 'date_of_death', 'county', 'sub_county',
       'administration_type', 'grant_reference', 'grant_date', 'confirmed_grant_date',
-      'estate_value_estimate', 'assigned_officer_id', 'current_status', 'notes'
+      'estate_value_estimate', 'assigned_officer_id', 'current_status', 'notes',
+      // Conveyancing fields
+      'conveyancing_status', 'conveyancing_received_date', 'administration_route',
+      'conveyancing_assigned_officer_id',
+      'certified_copy_grant_present', 'certified_copy_summary_cert_present',
+      'fees_paid_status', 'payment_reference', 'payment_date',
+      'lr39_prepared', 'lr39_prepared_date', 'lr39_prepared_by',
+      'lr39_signed_sealed', 'lr39_signed_sealed_date', 'lr39_signed_sealed_by',
+      'lr42_prepared', 'lr42_prepared_date', 'lr42_prepared_by',
+      'lr42_signed_sealed', 'lr42_signed_sealed_date', 'lr42_signed_sealed_by'
     ];
 
     const updates = [];
@@ -293,17 +350,35 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
       ipAddress: getClientIp(req)
     });
 
-    // Workflow event for status change
-    if (req.body.current_status && req.body.current_status !== before.current_status) {
+    // Workflow event for conveyancing status change
+    if (req.body.conveyancing_status && req.body.conveyancing_status !== before.conveyancing_status) {
       await createWorkflowEvent({
         estateFileId: estateId,
         eventType: 'STATUS_CHANGE',
-        fromStatus: before.current_status,
-        toStatus: req.body.current_status,
-        description: `Status changed from ${before.current_status} to ${req.body.current_status}`,
+        fromStatus: before.conveyancing_status,
+        toStatus: req.body.conveyancing_status,
+        description: `Conveyancing status: ${before.conveyancing_status} → ${req.body.conveyancing_status}`,
         performedBy: req.user.id,
         ipAddress: getClientIp(req)
       });
+    }
+
+    // Workflow event for checklist changes
+    const checklistFields = [
+      'certified_copy_grant_present', 'certified_copy_summary_cert_present',
+      'fees_paid_status', 'lr39_prepared', 'lr42_prepared',
+      'lr39_signed_sealed', 'lr42_signed_sealed'
+    ];
+    for (const field of checklistFields) {
+      if (req.body[field] !== undefined && req.body[field] !== before[field]) {
+        await createWorkflowEvent({
+          estateFileId: estateId,
+          eventType: 'NOTE',
+          description: `Checklist: ${field.replace(/_/g, ' ')} updated to ${req.body[field]}`,
+          performedBy: req.user.id,
+          ipAddress: getClientIp(req)
+        });
+      }
     }
 
     res.json({ estate_file: after });

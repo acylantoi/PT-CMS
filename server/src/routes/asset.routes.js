@@ -2,7 +2,14 @@ const express = require('express');
 const { query } = require('../db/connection');
 const { authenticate, authorize } = require('../middleware/auth');
 const { createAuditLog, createWorkflowEvent, getClientIp } = require('../utils/audit');
-const { ASSET_STATUS_TRANSITIONS, isValidTransition } = require('../utils/statusTransitions');
+const {
+  PARCEL_STATUS_TRANSITIONS,
+  ASSET_STATUS_TRANSITIONS,
+  GENERIC_ASSET_STATUS_TRANSITIONS,
+  isValidTransition,
+  checkParcelClosureGate,
+  checkGenericAssetCompletionGate
+} = require('../utils/statusTransitions');
 
 const router = express.Router();
 
@@ -10,10 +17,7 @@ const router = express.Router();
 router.post('/estate-files/:estateFileId/assets', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (req, res, next) => {
   try {
     const { estateFileId } = req.params;
-    const {
-      asset_type, parcel_number, registry_office, county,
-      land_size, title_type, encumbrance_flag, encumbrance_notes
-    } = req.body;
+    const b = req.body;
 
     // Verify estate file
     const estate = await query('SELECT id, file_number FROM estate_files WHERE id = $1 AND is_deleted = false', [estateFileId]);
@@ -21,20 +25,77 @@ router.post('/estate-files/:estateFileId/assets', authenticate, authorize('ADMIN
       return res.status(404).json({ error: 'Estate file not found.' });
     }
 
-    // Validate: parcel_number required if LAND_PARCEL
-    const type = asset_type || 'LAND_PARCEL';
-    if (type === 'LAND_PARCEL' && !parcel_number) {
-      return res.status(400).json({ error: 'parcel_number is required for LAND_PARCEL asset type.' });
+    const VALID_TYPES = ['LAND_PARCEL', 'LAND_COMPANY', 'SHARES_CDSC', 'SHARES_CERTIFICATE', 'MOTOR_VEHICLE', 'UFAA_CLAIM', 'DISCHARGE_OF_CHARGE', 'OTHER'];
+    const type = b.asset_type || 'LAND_PARCEL';
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ error: `Invalid asset_type. Must be one of: ${VALID_TYPES.join(', ')}` });
     }
 
-    const result = await query(`
-      INSERT INTO assets (estate_file_id, asset_type, parcel_number, registry_office, county, land_size, title_type, encumbrance_flag, encumbrance_notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `, [estateFileId, type, parcel_number || null, registry_office || null, county || null,
-        land_size || null, title_type || null, encumbrance_flag || false, encumbrance_notes || null]);
+    // Validate required fields per type
+    if (type === 'LAND_PARCEL' && !b.parcel_number) {
+      return res.status(400).json({ error: 'parcel_number is required for LAND_PARCEL.' });
+    }
+    if (type === 'MOTOR_VEHICLE' && !b.vehicle_reg_number) {
+      return res.status(400).json({ error: 'vehicle_reg_number is required for MOTOR_VEHICLE.' });
+    }
+
+    // Build a dynamic insert — all possible columns
+    const assetFields = {
+      estate_file_id: estateFileId,
+      asset_type: type,
+      // Common
+      asset_description: b.asset_description || null,
+      estimated_value: b.estimated_value || null,
+      transferee_name: b.transferee_name || null,
+      notes: b.notes || null,
+      // Land Parcel
+      parcel_number: b.parcel_number || null,
+      registry_office: b.registry_office || null,
+      county: b.county || null,
+      land_size: b.land_size || null,
+      title_type: b.title_type || null,
+      encumbrance_flag: b.encumbrance_flag || false,
+      encumbrance_notes: b.encumbrance_notes || null,
+      // Land Company
+      company_name: b.company_name || null,
+      company_reg_number: b.company_reg_number || null,
+      share_certificate_number: b.share_certificate_number || null,
+      plot_allocation: b.plot_allocation || null,
+      number_of_shares: b.number_of_shares || null,
+      // Shares (CDSC & Certificate)
+      cdsc_account_number: b.cdsc_account_number || null,
+      // Motor Vehicle
+      vehicle_reg_number: b.vehicle_reg_number || null,
+      chassis_number: b.chassis_number || null,
+      vehicle_make_model: b.vehicle_make_model || null,
+      // UFAA
+      ufaa_reference_number: b.ufaa_reference_number || null,
+      financial_institution: b.financial_institution || null,
+      amount_claimed: b.amount_claimed || null,
+      // Discharge of Charge
+      lending_institution: b.lending_institution || null,
+      loan_reference_number: b.loan_reference_number || null,
+      property_parcel_number: b.property_parcel_number || null,
+    };
+
+    // Set initial status based on asset type
+    if (type === 'LAND_PARCEL' || type === 'LAND_COMPANY') {
+      assetFields.parcel_status = 'PARCEL_CAPTURED';
+    } else {
+      assetFields.generic_status = 'NOT_STARTED';
+    }
+
+    const cols = Object.keys(assetFields);
+    const vals = Object.values(assetFields);
+    const placeholders = cols.map((_, i) => `$${i + 1}`);
+
+    const result = await query(
+      `INSERT INTO assets (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
+      vals
+    );
 
     const asset = result.rows[0];
+    const label = b.parcel_number || b.vehicle_reg_number || b.company_name || b.ufaa_reference_number || type;
 
     await createAuditLog({
       actorId: req.user.id,
@@ -49,7 +110,7 @@ router.post('/estate-files/:estateFileId/assets', authenticate, authorize('ADMIN
       estateFileId,
       assetId: asset.id,
       eventType: 'NOTE',
-      description: `Asset ${parcel_number || type} added to estate file ${estate.rows[0].file_number}`,
+      description: `Asset added: ${label} (${type.replace(/_/g, ' ')}) to file ${estate.rows[0].file_number}`,
       performedBy: req.user.id,
       ipAddress: getClientIp(req)
     });
@@ -110,7 +171,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
   }
 });
 
-// PATCH /api/assets/:id — update asset
+// PATCH /api/assets/:id — update asset (conveyancing parcel workflow)
 router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async (req, res, next) => {
   try {
     const currentResult = await query('SELECT * FROM assets WHERE id = $1 AND is_deleted = false', [req.params.id]);
@@ -119,7 +180,51 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
     }
     const before = currentResult.rows[0];
 
-    // Validate status transition
+    // Validate parcel status transition (LAND_PARCEL / LAND_COMPANY)
+    if (req.body.parcel_status && req.body.parcel_status !== before.parcel_status) {
+      if (!isValidTransition(PARCEL_STATUS_TRANSITIONS, before.parcel_status, req.body.parcel_status)) {
+        return res.status(400).json({
+          error: `Invalid parcel status transition from ${before.parcel_status} to ${req.body.parcel_status}.`,
+          allowed: PARCEL_STATUS_TRANSITIONS[before.parcel_status]
+        });
+      }
+
+      // Closure gate: must have proof or admin override
+      if (req.body.parcel_status === 'CLOSED') {
+        const checkData = { ...before, ...req.body };
+        const closureErrors = checkParcelClosureGate(checkData);
+        if (closureErrors.length > 0 && req.user.role !== 'ADMIN') {
+          return res.status(400).json({
+            error: 'Parcel closure gate failed.',
+            blockers: closureErrors
+          });
+        }
+      }
+    }
+
+    // Validate generic_status transition (non-land asset types)
+    if (req.body.generic_status && req.body.generic_status !== before.generic_status) {
+      if (!isValidTransition(GENERIC_ASSET_STATUS_TRANSITIONS, before.generic_status, req.body.generic_status)) {
+        return res.status(400).json({
+          error: `Invalid generic status transition from ${before.generic_status} to ${req.body.generic_status}.`,
+          allowed: GENERIC_ASSET_STATUS_TRANSITIONS[before.generic_status]
+        });
+      }
+
+      // Completion gate for non-land assets
+      if (req.body.generic_status === 'COMPLETED') {
+        const checkData = { ...before, ...req.body };
+        const completionErrors = checkGenericAssetCompletionGate(checkData);
+        if (completionErrors.length > 0 && req.user.role !== 'ADMIN') {
+          return res.status(400).json({
+            error: 'Asset completion gate failed.',
+            blockers: completionErrors
+          });
+        }
+      }
+    }
+
+    // Legacy asset_status validation
     if (req.body.asset_status && req.body.asset_status !== before.asset_status) {
       if (!isValidTransition(ASSET_STATUS_TRANSITIONS, before.asset_status, req.body.asset_status)) {
         return res.status(400).json({
@@ -130,8 +235,44 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
     }
 
     const allowedFields = [
-      'asset_type', 'parcel_number', 'registry_office', 'county',
-      'land_size', 'title_type', 'encumbrance_flag', 'encumbrance_notes', 'asset_status'
+      'asset_type', 'asset_description', 'estimated_value', 'transferee_name', 'notes',
+      // Land Parcel fields
+      'parcel_number', 'registry_office', 'county',
+      'land_size', 'title_type', 'encumbrance_flag', 'encumbrance_notes',
+      'asset_status', 'parcel_status',
+      'transfer_rate_amount', 'transfer_rate_currency', 'transfer_rate_notes',
+      'docs_issued_to_client', 'issue_date', 'issued_by_user_id', 'issue_notes',
+      'proof_of_registration_received', 'proof_received_date',
+      'closure_override', 'closure_override_reason',
+      // Land Company fields
+      'company_name', 'company_reg_number', 'share_certificate_number',
+      'plot_allocation', 'number_of_shares',
+      'proof_share_transfer_received',
+      // Shares fields (CDSC / Certificate)
+      'cdsc_account_number',
+      'cds7_prepared', 'cds7_prepared_date',
+      'cds2_prepared', 'cds2_prepared_date',
+      'sale_transfer_prepared', 'sale_transfer_prepared_date',
+      'discharge_indemnity_prepared', 'discharge_indemnity_prepared_date',
+      'shares_completion_date',
+      // Motor Vehicle fields
+      'vehicle_reg_number', 'chassis_number', 'vehicle_make_model',
+      'form_c_prepared', 'form_c_prepared_date',
+      'signed_sealed', 'signed_sealed_date',
+      'logbook_transfer_confirmed', 'logbook_transfer_date',
+      // UFAA fields
+      'ufaa_reference_number', 'financial_institution', 'amount_claimed',
+      'form_4b_prepared', 'form_4b_prepared_date',
+      'form_5_prepared', 'form_5_prepared_date',
+      'claimant_account_details_captured',
+      'proof_funds_received_by_pt', 'payment_date_to_pt',
+      'transmission_to_beneficiary_status',
+      // Discharge of Charge fields
+      'lending_institution', 'loan_reference_number', 'property_parcel_number',
+      'discharge_document_prepared', 'discharge_document_prepared_date',
+      'discharge_registered', 'discharge_date',
+      // Generic status for non-land assets
+      'generic_status'
     ];
 
     const updates = [];
@@ -168,6 +309,45 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
       ipAddress: getClientIp(req)
     });
 
+    // Workflow event for parcel status change
+    if (req.body.parcel_status && req.body.parcel_status !== before.parcel_status) {
+      await createWorkflowEvent({
+        estateFileId: before.estate_file_id,
+        assetId: req.params.id,
+        eventType: 'STATUS_CHANGE',
+        fromStatus: before.parcel_status,
+        toStatus: req.body.parcel_status,
+        description: `Parcel ${before.parcel_number || before.asset_type}: ${before.parcel_status} → ${req.body.parcel_status}`,
+        performedBy: req.user.id,
+        ipAddress: getClientIp(req)
+      });
+    }
+
+    // Workflow event for issuance
+    if (req.body.docs_issued_to_client && !before.docs_issued_to_client) {
+      await createWorkflowEvent({
+        estateFileId: before.estate_file_id,
+        assetId: req.params.id,
+        eventType: 'NOTE',
+        description: `Documents issued for parcel ${before.parcel_number}. ${req.body.issue_notes || ''}`.trim(),
+        performedBy: req.user.id,
+        ipAddress: getClientIp(req)
+      });
+    }
+
+    // Workflow event for proof received
+    if (req.body.proof_of_registration_received && !before.proof_of_registration_received) {
+      await createWorkflowEvent({
+        estateFileId: before.estate_file_id,
+        assetId: req.params.id,
+        eventType: 'NOTE',
+        description: `Proof of registration received for parcel ${before.parcel_number}.`,
+        performedBy: req.user.id,
+        ipAddress: getClientIp(req)
+      });
+    }
+
+    // Workflow event for legacy asset_status change
     if (req.body.asset_status && req.body.asset_status !== before.asset_status) {
       await createWorkflowEvent({
         estateFileId: before.estate_file_id,
@@ -175,7 +355,22 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
         eventType: 'STATUS_CHANGE',
         fromStatus: before.asset_status,
         toStatus: req.body.asset_status,
-        description: `Asset ${before.parcel_number || before.asset_type} status changed from ${before.asset_status} to ${req.body.asset_status}`,
+        description: `Asset ${before.parcel_number || before.vehicle_reg_number || before.company_name || before.asset_type} status changed from ${before.asset_status} to ${req.body.asset_status}`,
+        performedBy: req.user.id,
+        ipAddress: getClientIp(req)
+      });
+    }
+
+    // Workflow event for generic_status change (non-land assets)
+    if (req.body.generic_status && req.body.generic_status !== before.generic_status) {
+      const label = before.vehicle_reg_number || before.company_name || before.ufaa_reference_number || before.asset_description || before.asset_type;
+      await createWorkflowEvent({
+        estateFileId: before.estate_file_id,
+        assetId: req.params.id,
+        eventType: 'STATUS_CHANGE',
+        fromStatus: before.generic_status,
+        toStatus: req.body.generic_status,
+        description: `${before.asset_type.replace(/_/g, ' ')} "${label}": ${before.generic_status} → ${req.body.generic_status}`,
         performedBy: req.user.id,
         ipAddress: getClientIp(req)
       });

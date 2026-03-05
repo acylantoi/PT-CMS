@@ -1,7 +1,8 @@
 // Server entry point — for local development and standalone hosting
 // For Vercel serverless, see /api/index.js which imports app.js directly
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const app = require('./app');
 
 const PORT = process.env.PORT || 5000;

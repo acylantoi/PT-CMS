@@ -20,6 +20,8 @@ function EstateFileForm() {
     sub_county: '',
     intake_date: new Date().toISOString().split('T')[0],
     administration_type: 'COURT',
+    administration_route: 'COURT_GRANT',
+    conveyancing_received_date: new Date().toISOString().split('T')[0],
     grant_reference: '',
     grant_date: '',
     confirmed_grant_date: '',
@@ -46,6 +48,8 @@ function EstateFileForm() {
             sub_county: ef.sub_county || '',
             intake_date: ef.intake_date ? ef.intake_date.split('T')[0] : '',
             administration_type: ef.administration_type || 'COURT',
+            administration_route: ef.administration_route || (ef.administration_type === 'COURT' ? 'COURT_GRANT' : 'SUMMARY_CERT'),
+            conveyancing_received_date: ef.conveyancing_received_date ? ef.conveyancing_received_date.split('T')[0] : '',
             grant_reference: ef.grant_reference || '',
             grant_date: ef.grant_date ? ef.grant_date.split('T')[0] : '',
             confirmed_grant_date: ef.confirmed_grant_date ? ef.confirmed_grant_date.split('T')[0] : '',
@@ -60,7 +64,13 @@ function EstateFileForm() {
   }, [id]);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const updates = { [name]: value };
+    // Auto-sync administration_route when administration_type changes
+    if (name === 'administration_type') {
+      updates.administration_route = value === 'COURT' ? 'COURT_GRANT' : 'SUMMARY_CERT';
+    }
+    setForm(prev => ({ ...prev, ...updates }));
   };
 
   const handleSubmit = async (e) => {
@@ -156,19 +166,48 @@ function EstateFileForm() {
               </div>
             </div>
 
+            {/* Conveyancing-specific fields */}
+            <div style={{ background: '#E8F5E9', border: '1px solid #C8E6C9', borderRadius: '8px', padding: '16px', margin: '16px 0' }}>
+              <h3 style={{ fontSize: '14px', color: '#1B5E20', marginBottom: '12px' }}>📋 Conveyancing Receipt Details</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date Received at Conveyancing *</label>
+                  <input type="date" name="conveyancing_received_date" value={form.conveyancing_received_date} onChange={handleChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Administration Route</label>
+                  <select name="administration_route" value={form.administration_route} onChange={handleChange}>
+                    <option value="COURT_GRANT">Court Grant</option>
+                    <option value="SUMMARY_CERT">Summary Certificate</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="form-row">
-              <div className="form-group">
-                <label>Grant Reference</label>
-                <input name="grant_reference" value={form.grant_reference} onChange={handleChange} placeholder="Court case no / certificate ref" />
-              </div>
-              <div className="form-group">
-                <label>Grant Date</label>
-                <input type="date" name="grant_date" value={form.grant_date} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label>Confirmed Grant Date</label>
-                <input type="date" name="confirmed_grant_date" value={form.confirmed_grant_date} onChange={handleChange} />
-              </div>
+              {form.administration_route === 'SUMMARY_CERT' ? (
+                <div className="form-group">
+                  <label>Date of Summary Certificate</label>
+                  <input type="date" name="grant_date" value={form.grant_date} onChange={handleChange} />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Court File Number</label>
+                  <input name="grant_reference" value={form.grant_reference} onChange={handleChange} placeholder="e.g. Succession Cause No. 123/2025" />
+                </div>
+              )}
+              {form.administration_route !== 'SUMMARY_CERT' && (
+                <div className="form-group">
+                  <label>Grant Date</label>
+                  <input type="date" name="grant_date" value={form.grant_date} onChange={handleChange} />
+                </div>
+              )}
+              {form.administration_route !== 'SUMMARY_CERT' && (
+                <div className="form-group">
+                  <label>Confirmed Grant Date</label>
+                  <input type="date" name="confirmed_grant_date" value={form.confirmed_grant_date} onChange={handleChange} />
+                </div>
+              )}
             </div>
 
             <div className="form-row">

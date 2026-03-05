@@ -9,3 +9,7 @@ uploads/
 .DS_Store
 coverage/
 .vercel
+client/src/pages/EstateFileDetail 2.js
+server/src/middleware/testMode 2.js
+server/_scan.js
+server/scan-regions.js

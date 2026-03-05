@@ -52,6 +52,48 @@ router.get('/', authenticate, async (req, res, next) => {
       WHERE created_at >= date_trunc('month', CURRENT_DATE)
     `);
 
+    // Asset counts
+    const totalAssets = await query(`
+      SELECT COUNT(*) as count FROM assets WHERE is_deleted = false
+    `);
+    const totalParcels = await query(`
+      SELECT COUNT(*) as count FROM assets 
+      WHERE is_deleted = false AND asset_type IN ('LAND_PARCEL', 'LAND_COMPANY')
+    `);
+    const transfersCompleted = await query(`
+      SELECT COUNT(*) as count FROM transfers WHERE transfer_status = 'COMPLETED'
+    `);
+
+    // Asset type breakdown
+    const assetTypeBreakdown = await query(`
+      SELECT asset_type, COUNT(*) as count
+      FROM assets WHERE is_deleted = false
+      GROUP BY asset_type
+      ORDER BY count DESC
+    `);
+
+    // Conveyancing-specific counts
+    const awaitingCopies = await query(`
+      SELECT COUNT(*) as count FROM estate_files
+      WHERE is_deleted = false AND conveyancing_status = 'AWAITING_CERTIFIED_COPIES'
+    `);
+    const awaitingFees = await query(`
+      SELECT COUNT(*) as count FROM estate_files
+      WHERE is_deleted = false AND conveyancing_status = 'AWAITING_FEE_CONFIRMATION'
+    `);
+    const formsInProgress = await query(`
+      SELECT COUNT(*) as count FROM estate_files
+      WHERE is_deleted = false AND conveyancing_status IN ('FORMS_IN_PROGRESS', 'FORMS_READY')
+    `);
+    const awaitingProof = await query(`
+      SELECT COUNT(*) as count FROM estate_files
+      WHERE is_deleted = false AND conveyancing_status = 'AWAITING_RETURNED_TITLE_COPY'
+    `);
+    const closedFiles = await query(`
+      SELECT COUNT(*) as count FROM estate_files
+      WHERE is_deleted = false AND conveyancing_status = 'CLOSED'
+    `);
+
     // Administration type breakdown
     const adminBreakdown = await query(`
       SELECT administration_type, COUNT(*) as count
@@ -88,10 +130,19 @@ router.get('/', authenticate, async (req, res, next) => {
         in_conveyancing: parseInt(inConveyancing.rows[0].count),
         completed_this_month: parseInt(completedThisMonth.rows[0].count),
         on_hold: parseInt(onHold.rows[0].count),
-        transfers_this_month: parseInt(transfersThisMonth.rows[0].count)
+        transfers_this_month: parseInt(transfersThisMonth.rows[0].count),
+        awaiting_certified_copies: parseInt(awaitingCopies.rows[0].count),
+        awaiting_fees: parseInt(awaitingFees.rows[0].count),
+        forms_in_progress: parseInt(formsInProgress.rows[0].count),
+        awaiting_proof: parseInt(awaitingProof.rows[0].count),
+        closed_files: parseInt(closedFiles.rows[0].count),
+        total_assets: parseInt(totalAssets.rows[0].count),
+        total_parcels: parseInt(totalParcels.rows[0].count),
+        transfers_completed: parseInt(transfersCompleted.rows[0].count)
       },
       status_breakdown: statusCounts.rows,
       admin_type_breakdown: adminBreakdown.rows,
+      asset_type_breakdown: assetTypeBreakdown.rows,
       recent_events: recentEvents.rows,
       officer_workload: officerWorkload.rows
     });

@@ -1,9 +1,9 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const path = require('path');
 const rateLimit = require('express-rate-limit');
 
 const { pool } = require('./db/connection');
@@ -20,6 +20,7 @@ const auditRoutes = require('./routes/audit.routes');
 const importRoutes = require('./routes/import.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const { errorHandler } = require('./middleware/errorHandler');
+const testModeMiddleware = require('./middleware/testMode');
 
 const app = express();
 
@@ -32,6 +33,9 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
+
+// ── TEST MODE — intercept all /api/* requests with mock data ──
+app.use(testModeMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({

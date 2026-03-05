@@ -76,7 +76,11 @@ function EstateFiles() {
     setSearchParams(params);
   };
 
-  const statuses = ['INTAKE', 'WAITING_GRANT', 'IN_CONVEYANCING', 'PARTIALLY_COMPLETED', 'COMPLETED', 'ON_HOLD'];
+  const statuses = [
+    'RECEIVED_AT_CONVEYANCING', 'AWAITING_CERTIFIED_COPIES', 'AWAITING_FEE_CONFIRMATION',
+    'FORMS_IN_PROGRESS', 'FORMS_READY', 'DOCUMENTS_ISSUED',
+    'AWAITING_RETURNED_TITLE_COPY', 'PARTIALLY_CLOSED', 'CLOSED'
+  ];
 
   return (
     <div>
@@ -134,12 +138,12 @@ function EstateFiles() {
                   <tr>
                     <th>File No</th>
                     <th>Deceased</th>
-                    <th>Type</th>
+                    <th>Route</th>
                     <th>County</th>
-                    <th>Assigned Officer</th>
-                    <th>Status</th>
-                    <th>Assets</th>
-                    <th>Intake Date</th>
+                    <th>Officer</th>
+                    <th>Conv. Status</th>
+                    <th>Parcels</th>
+                    <th>Received</th>
                     <th>Updated</th>
                   </tr>
                 </thead>
@@ -148,12 +152,12 @@ function EstateFiles() {
                     <tr key={f.id} className="clickable" onClick={() => window.location.href = `/estate-files/${f.id}`}>
                       <td><Link to={`/estate-files/${f.id}`} onClick={e => e.stopPropagation()}><strong>{f.file_number}</strong></Link></td>
                       <td>{f.deceased_full_name}</td>
-                      <td><StatusBadge status={f.administration_type} /></td>
+                      <td><StatusBadge status={f.administration_route || f.administration_type} /></td>
                       <td>{f.county || '—'}</td>
                       <td>{f.officer_name || '—'}</td>
-                      <td><StatusBadge status={f.current_status} /></td>
+                      <td><StatusBadge status={f.conveyancing_status || f.current_status} /></td>
                       <td>{f.asset_count}</td>
-                      <td>{formatDate(f.intake_date)}</td>
+                      <td>{formatDate(f.conveyancing_received_date || f.intake_date)}</td>
                       <td>{formatDate(f.updated_at)}</td>
                     </tr>
                   ))}

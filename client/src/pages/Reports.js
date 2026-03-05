@@ -16,6 +16,7 @@ function Reports() {
   const [registryOffice, setRegistryOffice] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [assetType, setAssetType] = useState('');
 
   useEffect(() => {
     api.get('/users', { params: { role: 'OFFICER', is_active: 'true' } })
@@ -34,6 +35,7 @@ function Reports() {
       if (registryOffice) params.registry_office = registryOffice;
       if (status) params.status = status;
       if (search) params.search = search;
+      if (assetType) params.asset_type = assetType;
 
       const res = await api.get(`/reports/${reportType}`, { params });
       setData(res.data.data || res.data);
@@ -55,6 +57,7 @@ function Reports() {
       if (registryOffice) params.registry_office = registryOffice;
       if (status) params.status = status;
       if (search) params.search = search;
+      if (assetType) params.asset_type = assetType;
 
       const res = await api.get(`/reports/${reportType}`, {
         params,
@@ -80,6 +83,10 @@ function Reports() {
     { value: 'by-county', label: 'By County / Registry' },
     { value: 'summary', label: 'Administration Summary' },
     { value: 'parcel-transferee', label: 'Parcel → Transferee Mapping' },
+    { value: 'asset-summary', label: 'Asset Summary by Type' },
+    { value: 'awaiting-copies', label: 'Stuck — Awaiting Certified Copies' },
+    { value: 'awaiting-fees', label: 'Stuck — Awaiting Fee Confirmation' },
+    { value: 'officer-workload', label: 'Officer Workload (Received / Issued / Closed)' },
   ];
 
   return (
@@ -147,6 +154,25 @@ function Reports() {
             <div className="form-group">
               <label>Search (parcel or transferee)</label>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." />
+            </div>
+          )}
+
+          {reportType === 'asset-summary' && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Asset Type</label>
+                <select value={assetType} onChange={e => setAssetType(e.target.value)}>
+                  <option value="">All Types</option>
+                  <option value="LAND_PARCEL">Land (Individual Title)</option>
+                  <option value="LAND_COMPANY">Land (Holding Company)</option>
+                  <option value="SHARES_CDSC">Shares (CDSC)</option>
+                  <option value="SHARES_CERTIFICATE">Shares (Certificate)</option>
+                  <option value="MOTOR_VEHICLE">Motor Vehicle</option>
+                  <option value="UFAA_CLAIM">UFAA Claim</option>
+                  <option value="DISCHARGE_OF_CHARGE">Discharge of Charge</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
             </div>
           )}
 

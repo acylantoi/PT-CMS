@@ -237,6 +237,64 @@ router.get('/by-county', authenticate, async (req, res, next) => {
   }
 });
 
+// GET /api/reports/asset-summary — all assets grouped by type
+router.get('/asset-summary', authenticate, async (req, res, next) => {
+  try {
+    const { from, to, format = 'json' } = req.query;
+    let sql = `
+      SELECT 
+        ef.file_number,
+        ef.deceased_full_name,
+        a.asset_type,
+        COALESCE(a.parcel_number, a.vehicle_reg_number, a.company_name, a.ufaa_reference_number, a.asset_description, a.asset_type::text) AS identifier,
+        COALESCE(a.parcel_status, a.generic_status, a.asset_status::text) AS status,
+        a.estimated_value,
+        a.transferee_name,
+        u.full_name AS officer_name,
+        a.created_at
+      FROM assets a
+      JOIN estate_files ef ON a.estate_file_id = ef.id
+      LEFT JOIN users u ON ef.assigned_officer_id = u.id
+      WHERE a.is_deleted = false AND ef.is_deleted = false
+    `;
+    const params = [];
+
+    if (from) {
+      params.push(from);
+      sql += ` AND a.created_at >= $${params.length}`;
+    }
+    if (to) {
+      params.push(to);
+      sql += ` AND a.created_at <= $${params.length}::date + interval '1 day'`;
+    }
+
+    sql += ' ORDER BY a.asset_type, a.created_at DESC';
+
+    const result = await query(sql, params);
+
+    if (format === 'csv') {
+      await createAuditLog({
+        actorId: req.user.id, entityType: 'reports', entityId: null,
+        action: 'EXPORT', after: { report: 'asset-summary', format, row_count: result.rows.length },
+        ipAddress: getClientIp(req)
+      });
+      return sendCsv(res, result.rows, 'asset_summary_report');
+    }
+    if (format === 'excel') {
+      await createAuditLog({
+        actorId: req.user.id, entityType: 'reports', entityId: null,
+        action: 'EXPORT', after: { report: 'asset-summary', format, row_count: result.rows.length },
+        ipAddress: getClientIp(req)
+      });
+      return sendExcel(res, result.rows, 'Asset Summary Report');
+    }
+
+    res.json({ data: result.rows, count: result.rows.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/reports/parcel-transferee — parcel to transferee mapping
 router.get('/parcel-transferee', authenticate, async (req, res, next) => {
   try {

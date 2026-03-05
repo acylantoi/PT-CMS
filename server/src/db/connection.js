@@ -1,6 +1,8 @@
 const { Pool } = require('pg');
 
 // Support both Supabase DATABASE_URL and individual env vars
+const useSSL = process.env.DB_SSL === 'true' || !!process.env.DATABASE_URL;
+
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
@@ -15,9 +17,10 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'pt_cms',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
-      max: 20,
+      ssl: useSSL ? { rejectUnauthorized: false } : false,
+      max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 10000,
     };
 
 const pool = new Pool(poolConfig);
