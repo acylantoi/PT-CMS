@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function Layout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊', roles: null },
@@ -17,10 +23,20 @@ function Layout({ children }) {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      {/* Mobile hamburger */}
+      <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+        <span className={`hamburger ${sidebarOpen ? 'open' : ''}`}>
+          <span></span><span></span><span></span>
+        </span>
+      </button>
+
+      {/* Overlay for mobile */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h2>🏛️ PT-CMS</h2>
-          <p>Public Trustee Conveyancing</p>
+          <p>Case Management System</p>
         </div>
 
         <nav className="sidebar-nav">

@@ -39,15 +39,15 @@ function Dashboard() {
           <div className="stat-value">{cards.awaiting_certified_copies ?? 0}</div>
           <div className="stat-label">Awaiting Certified Copies</div>
         </div>
-        <div className="stat-card" style={{ borderTop: '3px solid #F57F17' }}>
+        <div className="stat-card warning">
           <div className="stat-value">{cards.awaiting_fees ?? 0}</div>
           <div className="stat-label">Awaiting Fee Confirmation</div>
         </div>
-        <div className="stat-card" style={{ borderTop: '3px solid var(--primary)' }}>
+        <div className="stat-card">
           <div className="stat-value">{cards.forms_in_progress ?? 0}</div>
           <div className="stat-label">Forms In Progress</div>
         </div>
-        <div className="stat-card" style={{ borderTop: '3px solid #7B1FA2' }}>
+        <div className="stat-card">
           <div className="stat-value">{cards.awaiting_proof ?? 0}</div>
           <div className="stat-label">Awaiting Proof of Registration</div>
         </div>
@@ -65,7 +65,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      <div className="dashboard-grid">
         {/* Recent Activity */}
         <div className="card">
           <div className="card-header">

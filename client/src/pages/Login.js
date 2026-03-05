@@ -27,7 +27,8 @@ function Login() {
       <div className="login-card">
         <div className="logo">
           <h1>🏛️ PT-CMS</h1>
-          <p>Public Trustee Conveyancing Management System</p>
+          <p>Public Trustee Case Management System</p>
+          <p style={{ fontSize: '11px', color: '#9E9E9E', marginTop: '2px' }}>Republic of Kenya — Office of the Public Trustee</p>
         </div>
 
         {error && <div className="login-error">{error}</div>}

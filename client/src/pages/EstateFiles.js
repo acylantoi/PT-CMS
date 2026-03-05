@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { StatusBadge, Pagination, Loading, EmptyState, formatDate } from '../components/Common';
 
 function EstateFiles() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,9 +78,12 @@ function EstateFiles() {
   };
 
   const statuses = [
-    'RECEIVED_AT_CONVEYANCING', 'AWAITING_CERTIFIED_COPIES', 'AWAITING_FEE_CONFIRMATION',
-    'FORMS_IN_PROGRESS', 'FORMS_READY', 'DOCUMENTS_ISSUED',
-    'AWAITING_RETURNED_TITLE_COPY', 'PARTIALLY_CLOSED', 'CLOSED'
+    { group: 'Estate Status', items: ['INTAKE', 'WAITING_GRANT', 'IN_CONVEYANCING', 'ON_HOLD', 'COMPLETED'] },
+    { group: 'Conveyancing Status', items: [
+      'RECEIVED_AT_CONVEYANCING', 'AWAITING_CERTIFIED_COPIES', 'AWAITING_FEE_CONFIRMATION',
+      'FORMS_IN_PROGRESS', 'FORMS_READY', 'DOCUMENTS_ISSUED',
+      'AWAITING_RETURNED_TITLE_COPY', 'PARTIALLY_CLOSED', 'CLOSED'
+    ]}
   ];
 
   return (
@@ -102,7 +106,11 @@ function EstateFiles() {
         />
         <select value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
-          {statuses.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+          {statuses.map(g => (
+            <optgroup key={g.group} label={g.group}>
+              {g.items.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            </optgroup>
+          ))}
         </select>
         <select value={adminType} onChange={e => setAdminType(e.target.value)}>
           <option value="">All Types</option>
@@ -149,7 +157,7 @@ function EstateFiles() {
                 </thead>
                 <tbody>
                   {files.map(f => (
-                    <tr key={f.id} className="clickable" onClick={() => window.location.href = `/estate-files/${f.id}`}>
+                    <tr key={f.id} className="clickable" onClick={() => navigate(`/estate-files/${f.id}`)}>
                       <td><Link to={`/estate-files/${f.id}`} onClick={e => e.stopPropagation()}><strong>{f.file_number}</strong></Link></td>
                       <td>{f.deceased_full_name}</td>
                       <td><StatusBadge status={f.administration_route || f.administration_type} /></td>

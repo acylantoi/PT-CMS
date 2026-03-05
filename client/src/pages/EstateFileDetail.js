@@ -682,7 +682,11 @@ function EstateFileDetail() {
       {/* INFO CARDS */}
       <div className="info-cards-row">
         <InfoCard icon={'\u{1F464}'} label="Officer" value={ef.officer_name} accent="primary" />
-        <InfoCard icon={'\u{1F4CB}'} label="Grant Reference" value={ef.grant_reference} sub={ef.confirmed_grant_date ? 'Confirmed: ' + formatDate(ef.confirmed_grant_date) : null} />
+        {ef.administration_route === 'SUMMARY_CERT' ? (
+          <InfoCard icon={'\u{1F4CB}'} label="Summary Certificate" value={ef.grant_date ? formatDate(ef.grant_date) : 'Pending'} sub="Summary Certificate Route" />
+        ) : (
+          <InfoCard icon={'\u{1F4CB}'} label="Court File No." value={ef.grant_reference} sub={ef.confirmed_grant_date ? 'Confirmed: ' + formatDate(ef.confirmed_grant_date) : ef.grant_date ? 'Grant: ' + formatDate(ef.grant_date) : null} />
+        )}
         <InfoCard icon={'\u{1F4BC}'} label="Assets" value={completedAssets + ' / ' + assets.length + ' done'} sub={landAssets.length + ' land, ' + nonLandAssets.length + ' other'} />
         <InfoCard icon={'\u{1F4B0}'} label="Estate Value" value={ef.estate_value_estimate ? 'KES ' + Number(ef.estate_value_estimate).toLocaleString() : '\u2014'} accent="success" />
       </div>
@@ -710,8 +714,15 @@ function EstateFileDetail() {
                   <div className="detail-item"><div className="label">Deceased</div><div className="value"><strong>{ef.deceased_full_name}</strong></div></div>
                   <div className="detail-item"><div className="label">Date Received</div><div className="value">{formatDate(ef.conveyancing_received_date || ef.intake_date)}</div></div>
                   <div className="detail-item"><div className="label">Admin Route</div><div className="value"><StatusBadge status={ef.administration_route || ef.administration_type} /></div></div>
-                  <div className="detail-item"><div className="label">Grant Ref</div><div className="value">{ef.grant_reference || '\u2014'}</div></div>
-                  <div className="detail-item"><div className="label">Confirmed Grant</div><div className="value">{formatDate(ef.confirmed_grant_date)}</div></div>
+                  {ef.administration_route === 'SUMMARY_CERT' ? (
+                    <div className="detail-item"><div className="label">Date of Summary Certificate</div><div className="value">{formatDate(ef.grant_date)}</div></div>
+                  ) : (
+                    <>
+                      <div className="detail-item"><div className="label">Court File No.</div><div className="value">{ef.grant_reference || '\u2014'}</div></div>
+                      <div className="detail-item"><div className="label">Grant Date</div><div className="value">{formatDate(ef.grant_date)}</div></div>
+                      <div className="detail-item"><div className="label">Confirmed Grant</div><div className="value">{formatDate(ef.confirmed_grant_date)}</div></div>
+                    </>
+                  )}
                   <div className="detail-item"><div className="label">County</div><div className="value">{ef.county || '\u2014'}</div></div>
                   <div className="detail-item"><div className="label">Officer</div><div className="value">{ef.officer_name || '\u2014'}</div></div>
                 </div>
