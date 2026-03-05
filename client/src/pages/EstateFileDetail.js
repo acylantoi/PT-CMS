@@ -872,13 +872,17 @@ function EstateFileDetail() {
                         e.preventDefault();
                         const fd = new FormData(e.target);
                         try {
-                          await api.patch('/estate-files/' + id, {
+                          const body = {
                             memo_to_head_date: new Date().toISOString().split('T')[0],
                             memo_to_head_reference: fd.get('memo_ref') || null,
                             memo_to_head_by: user.id,
-                            memo_to_head_notes: fd.get('memo_notes') || null,
-                            conveyancing_status: 'MEMO_TO_HEAD'
-                          });
+                            memo_to_head_notes: fd.get('memo_notes') || null
+                          };
+                          // Only advance status if currently at FORMS_READY
+                          if (convStatus === 'FORMS_READY') {
+                            body.conveyancing_status = 'MEMO_TO_HEAD';
+                          }
+                          await api.patch('/estate-files/' + id, body);
                           fetchData();
                         } catch (err) {
                           alert(err.response?.data?.error || 'Failed to log memo.');

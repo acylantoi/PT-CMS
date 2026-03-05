@@ -254,12 +254,12 @@ router.patch('/:id', authenticate, authorize('ADMIN', 'OFFICER', 'CLERK'), async
     // Validate conveyancing status transition
     if (req.body.conveyancing_status && req.body.conveyancing_status !== before.conveyancing_status) {
       const newStatus = req.body.conveyancing_status;
-      const currentStatus = before.conveyancing_status;
+      const currentStatus = before.conveyancing_status || 'RECEIVED_AT_CONVEYANCING';
 
       if (!isValidTransition(CONVEYANCING_STATUS_TRANSITIONS, currentStatus, newStatus)) {
         return res.status(400).json({
           error: `Invalid conveyancing status transition from ${currentStatus} to ${newStatus}.`,
-          allowed: CONVEYANCING_STATUS_TRANSITIONS[currentStatus]
+          allowed: CONVEYANCING_STATUS_TRANSITIONS[currentStatus] || []
         });
       }
 
